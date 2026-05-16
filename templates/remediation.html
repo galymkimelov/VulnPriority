@@ -1,0 +1,165 @@
+{% extends "_base.html" %}
+{% set active_nav = "remediation" %}
+
+{% block title %}{{ t.title_remediation }}{% endblock %}
+{% block page_title %}{{ t.rem_page_title }}{% endblock %}
+{% block page_subtitle %}{{ t.rem_page_sub }}{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="card__head card__head--row">
+      <div>
+        <div class="card__title">{{ t.rem_card_title }}</div>
+        <div class="card__sub">{{ t.rem_card_sub }}</div>
+      </div>
+      <div class="actions">
+        <form class="inline-form" method="get" action="/remediation">
+          <input class="search__input" style="width: 260px; border:1px solid rgba(148,163,184,0.14); border-radius: 12px; padding: 9px 10px; background: rgba(7,12,20,0.6);" name="q" value="{{ filters.q if filters is defined else '' }}" placeholder="{{ t.ph_search_cve }}" />
+          <input class="search__input" style="width: 180px; border:1px solid rgba(148,163,184,0.14); border-radius: 12px; padding: 9px 10px; background: rgba(7,12,20,0.6);" name="asset" value="{{ filters.asset if filters is defined else '' }}" placeholder="{{ t.ph_asset_ip }}" />
+          <input type="hidden" name="page" value="1" />
+          <input type="hidden" name="page_size" value="{{ pagination.page_size if pagination is defined else 10 }}" />
+          <button class="btn btn-ghost btn-sm" type="submit">{{ t.apply }}</button>
+        </form>
+        <a class="btn btn-ghost" href="/vulnerabilities">{{ t.open_table }}</a>
+        <a class="btn btn-primary" href="/">{{ t.upload_scan_btn }}</a>
+      </div>
+    </div>
+    <div class="card__body">
+      <div class="kanban kanban--board">
+        {% for col in ["Open","In Progress","Pending Verification","Resolved","Verified"] %}
+          {% set col_key = col|lower|replace(' ', '-') %}
+          <div class="kanban-col kanban-col--{{ col_key }}" data-status="{{ col }}">
+            <div class="kanban-col__head">
+              <div class="kanban-col__title">
+                <span class="kanban-col__dot" aria-hidden="true"></span>
+                <span>{{ ls(col) }}</span>
+              </div>
+              <div class="kanban-col__count">{{ (totals_by_status[col]) if totals_by_status is defined and col in totals_by_status else ((columns[col]|length) if columns[col] is defined else 0) }}</div>
+            </div>
+            <div class="kanban-col__body" data-dropzone="{{ col }}">
+              {% for v in columns[col] %}
+                <div class="kanban-card" draggable="true" data-id="{{ v.id }}" data-status="{{ v.status }}">
+                  <div class="kanban-card__top">
+                    <a class="link" href="/vulnerabilities/{{ v.id }}">{{ v.cve }}</a>
+                    {% if v.risk_level == "High" %}
+                      <span class="badge badge-high">{{ lrisk(v.risk_level) }}</span>
+                    {% elif v.risk_level == "Medium" %}
+                      <span class="badge badge-medium">{{ lrisk(v.risk_level) }}</span>
+                    {% else %}
+                      <span class="badge badge-low">{{ lrisk(v.risk_level) }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="kanban-card__sub">{{ v.asset.ip if v.asset else "—" }} · CVSS {{ "%.1f"|format(v.cvss) }}</div>
+                  <div class="kanban-card__bottom">
+                    <span class="pill pill--risk">{{ "%.3f"|format(v.risk_score) }}</span>
+                    <span class="muted mono">#{{ v.id }}</span>
+                  </div>
+                </div>
+              {% endfor %}
+              {% if not columns[col] %}
+                <div class="kanban-empty">
+                  <div class="kanban-empty__title">{{ t.kanban_empty_title }}</div>
+                  <div class="kanban-empty__sub">{{ t.kanban_empty_sub }}</div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <form id="moveForm" method="post" style="display:none;">
+        <input type="hidden" name="status" id="moveStatus" />
+      </form>
+    </div>
+  </section>
+
+  {% if pagination is defined and pagination.total_pages > 1 %}
+    <div class="pager">
+      <div class="pager__left muted">{{ t.pager_showing }} {{ ((pagination.page - 1) * pagination.page_size + 1) if pagination.total else 0 }}–{{ ((pagination.page - 1) * pagination.page_size + pagination.page_size) if pagination.total else 0 }} {{ t.pager_per_column }} · {{ t.pager_total_label }} {{ pagination.total }}</div>
+      {% set base = "/remediation?q=" ~ (filters.q|urlencode if filters is defined else "") ~ "&asset=" ~ (filters.asset|urlencode if filters is defined else "") ~ "&page_size=" ~ pagination.page_size %}
+      <div class="pager__center">
+        <a class="pager__btn {% if pagination.page <= 1 %}is-disabled{% endif %}" href="{{ base ~ '&page=' ~ (pagination.page - 1) }}">‹</a>
+        {% for p in range(1, pagination.total_pages + 1) %}
+          {% if p == 1 or p == pagination.total_pages or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
+            <a class="pager__num {% if p == pagination.page %}is-active{% endif %}" href="{{ base ~ '&page=' ~ p }}">{{ p }}</a>
+          {% elif p == 2 and pagination.page > 3 %}
+            <span class="pager__dots">…</span>
+          {% elif p == pagination.total_pages - 1 and pagination.page < pagination.total_pages - 2 %}
+            <span class="pager__dots">…</span>
+          {% endif %}
+        {% endfor %}
+        <a class="pager__btn {% if pagination.page >= pagination.total_pages %}is-disabled{% endif %}" href="{{ base ~ '&page=' ~ (pagination.page + 1) }}">›</a>
+      </div>
+      <div class="pager__right">
+        <form class="inline-form" method="get" action="/remediation" style="gap:8px;">
+          <input type="hidden" name="q" value="{{ filters.q if filters is defined else '' }}" />
+          <input type="hidden" name="asset" value="{{ filters.asset if filters is defined else '' }}" />
+          <input type="hidden" name="page" value="1" />
+          <span class="muted" style="font-weight:800; font-size:12px;">{{ t.per_page }}</span>
+          <select name="page_size" onchange="this.form.submit()">
+            {% for s in [8,10,20,50] %}
+              <option value="{{ s }}" {% if s == pagination.page_size %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+  <script>
+    (function () {
+      var dragged = null;
+
+      function onDragStart(e) {
+        dragged = e.currentTarget;
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', dragged.getAttribute('data-id') || ''); } catch (_) {}
+        dragged.classList.add('is-dragging');
+      }
+      function onDragEnd() {
+        if (dragged) dragged.classList.remove('is-dragging');
+        dragged = null;
+      }
+
+      function onDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        e.currentTarget.classList.add('is-over');
+      }
+      function onDragLeave(e) {
+        e.currentTarget.classList.remove('is-over');
+      }
+
+      function onDrop(e) {
+        e.preventDefault();
+        var zone = e.currentTarget;
+        zone.classList.remove('is-over');
+        if (!dragged) return;
+
+        var id = dragged.getAttribute('data-id');
+        var newStatus = zone.getAttribute('data-dropzone');
+        if (!id || !newStatus) return;
+
+        zone.prepend(dragged);
+
+        var form = document.getElementById('moveForm');
+        var statusInput = document.getElementById('moveStatus');
+        statusInput.value = newStatus;
+        form.action = '/remediation/' + encodeURIComponent(id) + '/move';
+        form.submit();
+      }
+
+      var cards = document.querySelectorAll('.kanban-card[draggable="true"]');
+      for (var i = 0; i < cards.length; i++) {
+        cards[i].addEventListener('dragstart', onDragStart);
+        cards[i].addEventListener('dragend', onDragEnd);
+      }
+      var zones = document.querySelectorAll('.kanban-col__body[data-dropzone]');
+      for (var j = 0; j < zones.length; j++) {
+        zones[j].addEventListener('dragover', onDragOver);
+        zones[j].addEventListener('dragleave', onDragLeave);
+        zones[j].addEventListener('drop', onDrop);
+      }
+    })();
+  </script>
+{% endblock %}

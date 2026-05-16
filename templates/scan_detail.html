@@ -1,0 +1,179 @@
+{% extends "_base.html" %}
+{% set active_nav = "scans" %}
+
+{% block title %}{{ t.title_scan_detail }} #{{ scan.id }}{% endblock %}
+{% block page_title %}#{{ scan.id }}{% endblock %}
+{% block page_subtitle %}{{ t.scan_snapshot_sub }}{% endblock %}
+
+{% block content %}
+  <div class="actions" style="margin-bottom: 14px;">
+    <a class="btn btn-ghost" href="/scans">{{ t.back_scans }}</a>
+    <a class="btn btn-ghost" href="/vulnerabilities">{{ t.open_vuln_table }}</a>
+  </div>
+
+  <div class="row row--tight">
+    <div class="kpi">
+      <div class="kpi__label">{{ t.kpi_scan_time }}</div>
+      <div class="kpi__value mono js-local-dt" data-iso="{{ (scan.created_at.isoformat() ~ 'Z') if scan.created_at else '' }}" style="font-size: 14px;">{{ scan.created_at }}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">{{ t.th_source }}</div>
+      <div class="kpi__value mono" style="font-size: 14px;">{{ scan.source_filename if scan.source_filename else "—" }}</div>
+    </div>
+    <div class="kpi kpi--warn">
+      <div class="kpi__label">{{ t.th_hosts }}</div>
+      <div class="kpi__value">{{ scan.total_hosts }}</div>
+    </div>
+    <div class="kpi kpi--critical">
+      <div class="kpi__label">{{ t.kpi_vulnerabilities }}</div>
+      <div class="kpi__value">{{ scan.total_vulns }}</div>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="card__head card__head--row">
+      <div>
+        <div class="card__title">{{ t.delta_title }}</div>
+        <div class="card__sub">
+          {% if delta.prev_scan %}
+            {{ t.delta_vs }} #{{ delta.prev_scan.id }} ({{ delta.prev_scan.created_at }})
+          {% else %}
+            {{ t.no_prev_scan }}
+          {% endif %}
+        </div>
+      </div>
+      {% if delta.prev_scan %}
+        <div class="actions">
+          <span class="badge status-new">{{ t.badge_new }}: {{ delta.new_total }}</span>
+          <span class="badge status-fixed">{{ t.badge_resolved }}: {{ delta.resolved_total }}</span>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card__body">
+      {% if delta.prev_scan %}
+        <div class="table-wrapper table-wrapper--dense">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t.th_asset }}</th>
+                <th>{{ t.th_current }}</th>
+                <th>{{ t.th_previous }}</th>
+                <th>{{ t.th_new_cve }}</th>
+                <th>{{ t.th_resolved_cve }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in delta.by_asset %}
+                <tr>
+                  <td><span class="mono">{{ row.asset }}</span></td>
+                  <td><span class="pill pill--risk">{{ row.current }}</span></td>
+                  <td><span class="pill">{{ row.previous }}</span></td>
+                  <td>
+                    {% if row.new_cves %}
+                      <div class="cell-main">
+                        {% for c in row.new_cves[:6] %}
+                          <span class="badge status-new">{{ c }}</span>
+                        {% endfor %}
+                        {% if row.new_cves|length > 6 %}
+                          <span class="muted">+{{ row.new_cves|length - 6 }} {{ t.more_count }}</span>
+                        {% endif %}
+                      </div>
+                    {% else %}
+                      <span class="muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if row.resolved_cves %}
+                      <div class="cell-main">
+                        {% for c in row.resolved_cves[:6] %}
+                          <span class="badge status-fixed">{{ c }}</span>
+                        {% endfor %}
+                        {% if row.resolved_cves|length > 6 %}
+                          <span class="muted">+{{ row.resolved_cves|length - 6 }} {{ t.more_count }}</span>
+                        {% endif %}
+                      </div>
+                    {% else %}
+                      <span class="muted">—</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state empty-state--compact">
+          <div class="empty-state__sub">{{ t.delta_need_two }}</div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:16px;">
+    <div class="card__head">
+      <div class="card__title">{{ t.snapshot_title }}</div>
+      <div class="card__sub">{{ t.snapshot_sub }}</div>
+    </div>
+    {% if vulnerabilities %}
+      <div class="table-wrapper table-wrapper--dense">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t.th_cve }}</th>
+              <th>{{ t.th_asset }}</th>
+              <th>{{ t.th_cvss }}</th>
+              <th>{{ t.th_epss }}</th>
+              <th>{{ t.th_risk }}</th>
+              <th>{{ t.th_open_col }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vulnerabilities %}
+              <tr>
+                <td><span class="mono">{{ v.cve }}</span></td>
+                <td>{{ v.asset.ip if v.asset else "—" }}</td>
+                <td><span class="mono">{{ "%.1f"|format(v.cvss) }}</span></td>
+                <td><span class="mono">{{ "%.3f"|format(v.epss) }}</span></td>
+                <td><span class="pill pill--risk">{{ "%.3f"|format(v.risk_score) }}</span></td>
+                <td><a class="btn btn-primary btn-sm" href="/vulnerabilities/{{ v.id }}">{{ t.details }}</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state empty-state--compact">
+        <div class="empty-state__sub">{{ t.no_vuln_scan }}</div>
+      </div>
+    {% endif %}
+  </section>
+
+  <script>
+    (function () {
+      var nodes = document.querySelectorAll('.js-local-dt[data-iso]');
+      for (var i = 0; i < nodes.length; i++) {
+        var iso = nodes[i].getAttribute('data-iso');
+        if (!iso) continue;
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) continue;
+        try {
+          nodes[i].textContent = new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: 'Asia/Almaty',
+            hour12: false
+          }).format(d);
+          nodes[i].title = iso + ' (UTC) → Asia/Almaty';
+        } catch (e) {
+          nodes[i].textContent = d.toLocaleString();
+          nodes[i].title = iso + ' (UTC)';
+        }
+      }
+    })();
+  </script>
+{% endblock %}

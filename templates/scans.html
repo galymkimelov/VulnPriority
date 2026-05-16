@@ -1,0 +1,97 @@
+{% extends "_base.html" %}
+{% set active_nav = "scans" %}
+
+{% block title %}{{ t.title_scans }}{% endblock %}
+{% block page_title %}{{ t.scans_page_title }}{% endblock %}
+{% block page_subtitle %}{{ t.scans_page_sub }}{% endblock %}
+
+{% block content %}
+  <div class="row row--tight">
+    <div class="kpi">
+      <div class="kpi__label">{{ t.kpi_total_scans }}</div>
+      <div class="kpi__value">{{ scans|length if scans else 0 }}</div>
+    </div>
+    <div class="kpi kpi--warn">
+      <div class="kpi__label">{{ t.kpi_last_upload }}</div>
+      <div class="kpi__value mono js-local-dt" data-iso="{{ (scans[0].created_at.isoformat() ~ 'Z') if scans and scans[0].created_at else '' }}" style="font-size: 14px;">
+        {{ scans[0].created_at if scans else "—" }}
+      </div>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="card__head card__head--row">
+      <div>
+        <div class="card__title">{{ t.scans_card_title }}</div>
+        <div class="card__sub">{{ t.scans_card_sub }}</div>
+      </div>
+      <div class="actions">
+        <a class="btn btn-ghost" href="/vulnerabilities">{{ t.open_table }}</a>
+        <a class="btn btn-primary" href="/">{{ t.upload_scan_btn }}</a>
+      </div>
+    </div>
+
+    {% if scans %}
+      <div class="table-wrapper table-wrapper--dense">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t.th_id }}</th>
+              <th>{{ t.th_time }}</th>
+              <th>{{ t.th_source }}</th>
+              <th>{{ t.th_hosts }}</th>
+              <th>{{ t.th_vulns }}</th>
+              <th>{{ t.view }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in scans %}
+              <tr>
+                <td><span class="muted mono">{{ s.id }}</span></td>
+                <td><span class="mono js-local-dt" data-iso="{{ (s.created_at.isoformat() ~ 'Z') if s.created_at else '' }}">{{ s.created_at }}</span></td>
+                <td>{{ s.source_filename if s.source_filename else "—" }}</td>
+                <td><span class="pill">{{ s.total_hosts }}</span></td>
+                <td><span class="pill pill--risk">{{ s.total_vulns }}</span></td>
+                <td><a class="btn btn-primary btn-sm" href="/scans/{{ s.id }}">{{ t.view }}</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state__title">{{ t.no_scans_title }}</div>
+        <div class="empty-state__sub">{{ t.no_scans_sub }}</div>
+        <a class="btn btn-primary" href="/">{{ t.upload_scan_btn }}</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <script>
+    (function () {
+      var nodes = document.querySelectorAll('.js-local-dt[data-iso]');
+      for (var i = 0; i < nodes.length; i++) {
+        var iso = nodes[i].getAttribute('data-iso');
+        if (!iso) continue;
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) continue;
+        try {
+          nodes[i].textContent = new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: 'Asia/Almaty',
+            hour12: false
+          }).format(d);
+          nodes[i].title = iso + ' (UTC) → Asia/Almaty';
+        } catch (e) {
+          nodes[i].textContent = d.toLocaleString();
+          nodes[i].title = iso + ' (UTC)';
+        }
+      }
+    })();
+  </script>
+{% endblock %}

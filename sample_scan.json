@@ -1,0 +1,40 @@
+{
+  "host": "192.168.1.10",
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2021-44228",
+      "cvss": 10.0,
+      "description": "Log4Shell: Remote Code Execution in Apache Log4j2"
+    },
+    {
+      "cve": "CVE-2022-22965",
+      "cvss": 9.8,
+      "description": "Spring4Shell: RCE in Spring Framework"
+    },
+    {
+      "cve": "CVE-2023-23397",
+      "cvss": 9.8,
+      "description": "Microsoft Outlook privilege escalation via NTLM hash"
+    },
+    {
+      "cve": "CVE-2022-30190",
+      "cvss": 7.8,
+      "description": "Follina: MSDT remote code execution vulnerability"
+    },
+    {
+      "cve": "CVE-2021-34527",
+      "cvss": 8.8,
+      "description": "PrintNightmare: Windows Print Spooler RCE"
+    },
+    {
+      "cve": "CVE-2020-1472",
+      "cvss": 10.0,
+      "description": "Zerologon: Netlogon privilege escalation"
+    },
+    {
+      "cve": "CVE-2019-0708",
+      "cvss": 9.8,
+      "description": "BlueKeep: Remote Desktop Services RCE"
+    }
+  ]
+}

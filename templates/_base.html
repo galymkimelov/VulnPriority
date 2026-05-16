@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="{{ html_lang }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}VulnPriority{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260512dropdown" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar__top">
+        <a class="brand" href="/dashboard" aria-label="VulnPriority">
+          <span class="brand__logo" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2l8 4v6c0 6-3.5 9.5-8 10-4.5-.5-8-4-8-10V6l8-4z" stroke="currentColor" stroke-width="2" />
+              <path d="M9.5 12l1.8 1.8 3.6-3.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="brand__text">
+            <span class="brand__name">VulnPriority</span>
+          </span>
+        </a>
+
+      </div>
+
+      <nav class="nav">
+        <div class="nav__group-label">{{ t.nav_group_overview }}</div>
+        <a class="nav__item {% if active_nav == 'dashboard' %}is-active{% endif %}" href="/dashboard">
+          <span class="nav__icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M4 4h7v7H4V4zM13 4h7v7h-7V4zM4 13h7v7H4v-7zM13 13h7v7h-7v-7z" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </span>
+          <span>{{ t.nav_dashboard }}</span>
+        </a>
+        <a class="nav__item {% if active_nav == 'assets' %}is-active{% endif %}" href="/assets">
+          <span class="nav__icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>{{ t.nav_assets }}</span>
+        </a>
+
+        <div class="nav__group-label">{{ t.nav_group_vm }}</div>
+        <a class="nav__item {% if active_nav == 'vulns' %}is-active{% endif %}" href="/vulnerabilities">
+          <span class="nav__icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M8 6h13M8 12h13M8 18h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>{{ t.nav_vulns }}</span>
+        </a>
+        <a class="nav__item {% if active_nav == 'remediation' %}is-active{% endif %}" href="/remediation">
+          <span class="nav__icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M4 7h6v6H4V7zM14 7h6v6h-6V7zM4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>{{ t.nav_remediation }}</span>
+        </a>
+
+        <div class="nav__group-label">{{ t.nav_group_ops }}</div>
+        <a class="nav__item {% if active_nav == 'scans' %}is-active{% endif %}" href="/scans">
+          <span class="nav__icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M7 4v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M17 4v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M6 20h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M6 12h12v6H6v-6z" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </span>
+          <span>{{ t.nav_scans }}</span>
+        </a>
+        <a class="nav__item {% if active_nav == 'upload' %}is-active{% endif %}" href="/">
+          <span class="nav__icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 16V4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M7 9l5-5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 20h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>{{ t.nav_upload }}</span>
+        </a>
+      </nav>
+
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__left">
+          <div class="page-title">
+            <div class="page-title__h">{% block page_title %}{% endblock %}</div>
+            <div class="page-title__sub">{% block page_subtitle %}{% endblock %}</div>
+          </div>
+        </div>
+        <div class="topbar__center">
+          <form class="search" method="get" action="/vulnerabilities">
+            <span class="search__icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" stroke="currentColor" stroke-width="2"/>
+                <path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <input
+              class="search__input"
+              type="text"
+              name="q"
+              value="{{ request.query_params.get('q', '') }}"
+              placeholder="{{ t.search_placeholder }}"
+            />
+          </form>
+        </div>
+        <div class="topbar__right">
+          <div class="export-bar" role="group" aria-label="{{ t.export_menu_aria }}">
+            <span class="export-bar__label">{{ t.export_reports }}</span>
+            <a class="export-bar__link" href="/reports/vulnerabilities.csv?lang={{ locale }}">{{ t.export_csv }}</a>
+            <div class="export-bar__dropdown" id="pdf-dropdown">
+              <button class="export-bar__link export-bar__pdf-btn" type="button" id="pdf-toggle-btn">
+                PDF
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="margin-left:3px;vertical-align:middle;">
+                  <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <div class="export-bar__menu" id="pdf-lang-menu">
+                <a class="export-bar__menu-item" href="/reports/vulnerabilities.pdf?lang=kk">Қазақша (KK)</a>
+                <a class="export-bar__menu-item" href="/reports/vulnerabilities.pdf?lang=ru">Русский (RU)</a>
+                <a class="export-bar__menu-item" href="/reports/vulnerabilities.pdf?lang=en">English (EN)</a>
+              </div>
+            </div>
+          </div>
+          <div class="lang-switch" role="group" aria-label="{{ t.lang_switch }}">
+            <a class="lang-switch__seg {% if locale == 'kk' %}is-active{% endif %}" href="/set-language/kk?next={{ switch_next }}">KK</a>
+            <a class="lang-switch__seg {% if locale == 'ru' %}is-active{% endif %}" href="/set-language/ru?next={{ switch_next }}">RU</a>
+            <a class="lang-switch__seg {% if locale == 'en' %}is-active{% endif %}" href="/set-language/en?next={{ switch_next }}">EN</a>
+          </div>
+          <div class="chip chip--danger">
+            <span class="dot dot--red" aria-hidden="true"></span>
+            <span>{{ critical_count if critical_count is defined else 0 }} {{ t.chip_critical }}</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="content">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+<script>
+(function(){
+  var btn = document.getElementById('pdf-toggle-btn');
+  var dd  = document.getElementById('pdf-dropdown');
+  if(!btn || !dd) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    dd.classList.toggle('is-open');
+  });
+  document.addEventListener('click', function(){
+    dd.classList.remove('is-open');
+  });
+  dd.addEventListener('click', function(e){ e.stopPropagation(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+{% extends "_base.html" %}
+{% set active_nav = "vulns" %}
+
+{% block title %}{{ t.title_vulns }}{% endblock %}
+{% block page_title %}{{ t.vulns_page_title }}{% endblock %}
+{% block page_subtitle %}{{ t.vulns_page_sub }}{% endblock %}
+
+{% block content %}
+  <div class="row row--tight">
+    <div class="kpi">
+      <div class="kpi__label">{{ t.kpi_total }}</div>
+      <div class="kpi__value">{{ vulnerabilities|length if vulnerabilities else 0 }}</div>
+    </div>
+    <div class="kpi kpi--critical">
+      <div class="kpi__label">{{ t.kpi_high_risk }}</div>
+      <div class="kpi__value">{{ (vulnerabilities|selectattr('risk_level','equalto','High')|list|length) if vulnerabilities else 0 }}</div>
+    </div>
+    <div class="kpi kpi--warn">
+      <div class="kpi__label">{{ lsev('Medium') }}</div>
+      <div class="kpi__value">{{ (vulnerabilities|selectattr('risk_level','equalto','Medium')|list|length) if vulnerabilities else 0 }}</div>
+    </div>
+    <div class="kpi kpi--ok">
+      <div class="kpi__label">{{ lsev('Low') }}</div>
+      <div class="kpi__value">{{ (vulnerabilities|selectattr('risk_level','equalto','Low')|list|length) if vulnerabilities else 0 }}</div>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="card__head card__head--row">
+      <div>
+        <div class="card__title">{{ t.vuln_table_title }}</div>
+        <div class="card__sub">{{ t.vuln_table_sub }}</div>
+      </div>
+      <div class="actions">
+        <form class="inline-form" method="get" action="/vulnerabilities">
+          <input class="search__input" style="width: 260px; border:1px solid rgba(148,163,184,0.14); border-radius: 12px; padding: 9px 10px; background: rgba(7,12,20,0.6);" name="q" value="{{ filters.q if filters is defined else '' }}" placeholder="{{ t.ph_search_cve }}" />
+          <input class="search__input" style="width: 180px; border:1px solid rgba(148,163,184,0.14); border-radius: 12px; padding: 9px 10px; background: rgba(7,12,20,0.6);" name="asset" value="{{ filters.asset if filters is defined else '' }}" placeholder="{{ t.ph_asset_ip }}" />
+          <select name="severity">
+            <option value="" {% if filters is defined and not filters.severity %}selected{% endif %}>{{ t.filter_severity_all }}</option>
+            {% for s in ["Critical","High","Medium","Low"] %}
+              <option value="{{ s }}" {% if filters is defined and filters.severity == s %}selected{% endif %}>{{ lsev(s) }}</option>
+            {% endfor %}
+          </select>
+          <select name="status">
+            <option value="" {% if filters is defined and not filters.status %}selected{% endif %}>{{ t.filter_status_all }}</option>
+            {% for s in statuses %}
+              <option value="{{ s }}" {% if filters is defined and filters.status == s %}selected{% endif %}>{{ ls(s) }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="page" value="1" />
+          <input type="hidden" name="page_size" value="{{ pagination.page_size if pagination is defined else 10 }}" />
+          <button class="btn btn-ghost btn-sm" type="submit">{{ t.apply }}</button>
+        </form>
+        <a class="btn btn-primary" href="/">{{ t.rescan }}</a>
+      </div>
+    </div>
+
+    {% if vulnerabilities %}
+      <div class="table-wrapper table-wrapper--dense">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t.th_cve }}</th>
+              <th>{{ t.th_asset }}</th>
+              <th>{{ t.th_cvss }}</th>
+              <th>{{ t.th_epss }}</th>
+              <th>{{ t.th_risk }}</th>
+              <th>{{ t.th_severity }}</th>
+              <th>{{ t.th_status }}</th>
+              <th>{{ t.th_sla_due }}</th>
+              <th>{{ t.th_update_col }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vulnerabilities %}
+              <tr>
+                <td>
+                  <div class="cell-main">
+                    <a class="link" href="/vulnerabilities/{{ v.id }}">{{ v.cve }}</a>
+                    <div class="cell-sub">{{ v.description[:60] ~ ("…" if v.description and v.description|length > 60 else "") }}</div>
+                  </div>
+                </td>
+                <td>{{ v.asset.ip if v.asset else "—" }}</td>
+                <td><span class="mono">{{ "%.1f"|format(v.cvss) }}</span></td>
+                <td><span class="mono">{{ "%.3f"|format(v.epss) }}</span></td>
+                <td><span class="pill pill--risk">{{ "%.3f"|format(v.risk_score) }}</span></td>
+                <td>
+                  {% if v.severity_bucket == "Critical" %}
+                    <span class="badge badge-high">{{ lsev('Critical') }}</span>
+                  {% elif v.severity_bucket == "High" %}
+                    <span class="badge badge-medium">{{ lsev('High') }}</span>
+                  {% elif v.severity_bucket == "Medium" %}
+                    <span class="badge badge-low">{{ lsev('Medium') }}</span>
+                  {% else %}
+                    <span class="badge status-new">{{ lsev('Low') }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if v.status == "Open" %}
+                    <span class="badge status-new">{{ ls('Open') }}</span>
+                  {% elif v.status == "In Progress" %}
+                    <span class="badge status-progress">{{ ls('In Progress') }}</span>
+                  {% elif v.status == "Pending Verification" %}
+                    <span class="badge badge-medium">{{ ls('Pending Verification') }}</span>
+                  {% elif v.status == "Resolved" %}
+                    <span class="badge status-fixed">{{ ls('Resolved') }}</span>
+                  {% else %}
+                    <span class="badge badge-low">{{ ls('Verified') }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="mono js-almaty-dt" data-iso="{{ v.sla_due_iso }}">{{ v.sla_due_iso }}</span>
+                  {% if v.is_overdue %}
+                    <span class="badge badge-high" style="margin-left:8px;">{{ t.overdue }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <form class="inline-form" action="/vulnerabilities/{{ v.id }}/status" method="post">
+                    <select name="status">
+                      {% for s in statuses %}
+                        <option value="{{ s }}" {% if s == v.status %}selected{% endif %}>{{ ls(s) }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary btn-sm">{{ t.save }}</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if pagination is defined and pagination.total_pages > 1 %}
+        <div class="pager">
+          <div class="pager__left muted">{{ t.pager_showing }} {{ ((pagination.page - 1) * pagination.page_size + 1) if pagination.total else 0 }}–{{ ((pagination.page - 1) * pagination.page_size + (vulnerabilities|length)) if pagination.total else 0 }} {{ t.pager_of }} {{ pagination.total }}</div>
+          {% set base = "/vulnerabilities?q=" ~ (filters.q|urlencode if filters is defined else "") ~ "&asset=" ~ (filters.asset|urlencode if filters is defined else "") ~ "&severity=" ~ (filters.severity|urlencode if filters is defined else "") ~ "&status=" ~ (filters.status|urlencode if filters is defined else "") ~ "&page_size=" ~ pagination.page_size %}
+          <div class="pager__center">
+            <a class="pager__btn {% if pagination.page <= 1 %}is-disabled{% endif %}" href="{{ base ~ '&page=' ~ (pagination.page - 1) }}">‹</a>
+            {% for p in range(1, pagination.total_pages + 1) %}
+              {% if p == 1 or p == pagination.total_pages or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
+                <a class="pager__num {% if p == pagination.page %}is-active{% endif %}" href="{{ base ~ '&page=' ~ p }}">{{ p }}</a>
+              {% elif p == 2 and pagination.page > 3 %}
+                <span class="pager__dots">…</span>
+              {% elif p == pagination.total_pages - 1 and pagination.page < pagination.total_pages - 2 %}
+                <span class="pager__dots">…</span>
+              {% endif %}
+            {% endfor %}
+            <a class="pager__btn {% if pagination.page >= pagination.total_pages %}is-disabled{% endif %}" href="{{ base ~ '&page=' ~ (pagination.page + 1) }}">›</a>
+          </div>
+          <div class="pager__right">
+            <form class="inline-form" method="get" action="/vulnerabilities" style="gap:8px;">
+              <input type="hidden" name="q" value="{{ filters.q if filters is defined else '' }}" />
+              <input type="hidden" name="asset" value="{{ filters.asset if filters is defined else '' }}" />
+              <input type="hidden" name="severity" value="{{ filters.severity if filters is defined else '' }}" />
+              <input type="hidden" name="status" value="{{ filters.status if filters is defined else '' }}" />
+              <input type="hidden" name="page" value="1" />
+              <span class="muted" style="font-weight:800; font-size:12px;">{{ t.per_page }}</span>
+              <select name="page_size" onchange="this.form.submit()">
+                {% for s in [8,10,20,50] %}
+                  <option value="{{ s }}" {% if s == pagination.page_size %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state__title">{{ t.no_data_title }}</div>
+        <div class="empty-state__sub">{{ t.no_data_sub }}</div>
+        <a class="btn btn-primary" href="/">{{ t.upload_scan_btn }}</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <script>
+    (function () {
+      var nodes = document.querySelectorAll('.js-almaty-dt[data-iso]');
+      for (var i = 0; i < nodes.length; i++) {
+        var iso = nodes[i].getAttribute('data-iso');
+        if (!iso) continue;
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) continue;
+        try {
+          nodes[i].textContent = new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Asia/Almaty',
+            hour12: false
+          }).format(d);
+          nodes[i].title = iso + ' (UTC) → Asia/Almaty';
+        } catch (e) {
+          nodes[i].textContent = d.toLocaleString();
+        }
+      }
+    })();
+  </script>
+{% endblock %}

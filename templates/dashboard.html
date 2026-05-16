@@ -1,0 +1,223 @@
+{% extends "_base.html" %}
+{% set active_nav = "dashboard" %}
+
+{% block title %}{{ t.title_dashboard }}{% endblock %}
+{% block page_title %}{{ t.dashboard_page_title }}{% endblock %}
+{% block page_subtitle %}{{ t.dashboard_page_sub }}{% endblock %}
+
+{% block content %}
+  {% set sev_chart_labels = [t.chart_sev_critical, t.chart_sev_high, t.chart_sev_medium, t.chart_sev_low] %}
+  <div class="row row--tight">
+    <div class="kpi">
+      <div class="kpi__label">{{ t.kpi_total_vulns }}</div>
+      <div class="kpi__value">{{ total }}</div>
+    </div>
+    <div class="kpi kpi--critical">
+      <div class="kpi__label">{{ t.kpi_critical_cvss }}</div>
+      <div class="kpi__value">{{ severity_counts.Critical }}</div>
+    </div>
+    <div class="kpi kpi--warn">
+      <div class="kpi__label">{{ t.kpi_in_progress }}</div>
+      <div class="kpi__value">{{ status_counts["In Progress"] }}</div>
+    </div>
+    <div class="kpi kpi--ok">
+      <div class="kpi__label">{{ t.kpi_fixed }}</div>
+      <div class="kpi__value">{{ status_counts.Fixed }}</div>
+    </div>
+  </div>
+
+  <div class="grid grid--2">
+    <section class="card card--fill">
+      <div class="card__head card__head--row">
+        <div>
+          <div class="card__title">{{ t.risk_trend_title }}</div>
+          <div class="card__sub">{{ t.risk_trend_sub }}</div>
+        </div>
+        <span class="chip chip--soft">{{ trend.labels|length }} {{ t.scans_count }}</span>
+      </div>
+      <div class="card__body">
+        <div style="height: 320px;">
+          <canvas id="riskTrend"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card--fill">
+      <div class="card__head card__head--row">
+        <div>
+          <div class="card__title">{{ t.severity_dist_title }}</div>
+          <div class="card__sub">{{ t.severity_dist_sub }}</div>
+        </div>
+        <span class="chip chip--soft">{{ total }} {{ t.total_suffix }}</span>
+      </div>
+      <div class="card__body">
+        <div style="height: 260px;">
+          <canvas id="sevDonut"></canvas>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid grid--2" style="margin-top:16px;">
+    <section class="card card--fill">
+      <div class="card__head">
+        <div class="card__title">{{ t.top_assets_title }}</div>
+        <div class="card__sub">{{ t.top_assets_sub }}</div>
+      </div>
+      <div class="card__body">
+        <div class="list">
+          {% if top5 %}
+            {% for v in top5 %}
+              <div class="list-item">
+                <div class="list-item__left">
+                  <div class="list-item__name">{{ v.asset.ip if v.asset else t.unknown_asset }}</div>
+                  <div class="list-item__sub">{{ v.cve }}</div>
+                </div>
+                <div class="list-item__right">
+                  {% if v.risk_level == "High" %}
+                    <span class="badge badge-high">{{ lrisk(v.risk_level) }}</span>
+                  {% elif v.risk_level == "Medium" %}
+                    <span class="badge badge-medium">{{ lrisk(v.risk_level) }}</span>
+                  {% else %}
+                    <span class="badge badge-low">{{ lrisk(v.risk_level) }}</span>
+                  {% endif %}
+                  <span class="pill pill--num">{{ (v.risk_score * 100)|round(0)|int }}</span>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state empty-state--compact">
+              <div class="empty-state__sub">{{ t.dash_empty }}</div>
+              <a class="btn btn-primary" href="/">{{ t.upload_scan_btn }}</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section class="card card--fill">
+      <div class="card__head">
+        <div class="card__title">{{ t.sla_title }}</div>
+        <div class="card__sub">{{ t.sla_sub }}</div>
+      </div>
+      <div class="card__body card__body--stack">
+        <div class="ring">
+          {% set sla = sla_percent %}
+          <div class="ring__value">{{ sla|round(0)|int }}%</div>
+          <div class="ring__label">{{ t.compliant }}</div>
+        </div>
+        <div class="bars">
+          <div class="bar">
+            <div class="bar__label">{{ t.within_sla }}</div>
+            <div class="bar__track"><div class="bar__fill bar__fill--ok" style="width: {{ sla }}%"></div></div>
+            <div class="bar__num">{{ sla|round(0)|int }}%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">{{ t.at_risk }}</div>
+            {% set risk = 100 - sla %}
+            <div class="bar__track"><div class="bar__fill bar__fill--warn" style="width: {{ risk }}%"></div></div>
+            <div class="bar__num">{{ risk|round(0)|int }}%</div>
+          </div>
+        </div>
+        <div class="card__spacer"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px;">
+    <div class="card__head">
+      <div class="card__title">{{ t.admin_title }}</div>
+      <div class="card__sub">{{ t.admin_sub }}</div>
+    </div>
+    <div class="card__body">
+      <div class="note" style="border-color: rgba(251, 113, 133, 0.22); background: rgba(251, 113, 133, 0.10);">
+        <span class="dot dot--red" aria-hidden="true"></span>
+        <span>{{ t.admin_warn }}</span>
+      </div>
+      <div style="height: 12px;"></div>
+      <form action="/admin/reset-db" method="post" onsubmit="return confirm({{ t.confirm_reset|tojson }});">
+        <button type="submit" class="btn btn-primary">{{ t.reset_db_btn }}</button>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      if (!window.Chart) return;
+
+      var trend = {{ trend|tojson }};
+      var sev = {{ severity_counts|tojson }};
+      var chartAvgLabel = {{ t.chart_avg_risk|tojson }};
+      var sevLabels = {{ sev_chart_labels|tojson }};
+
+      var trendEl = document.getElementById('riskTrend');
+      if (trendEl) {
+        new Chart(trendEl, {
+          type: 'line',
+          data: {
+            labels: trend.labels,
+            datasets: [{
+              label: chartAvgLabel,
+              data: trend.avg_risk,
+              borderColor: 'rgba(96,165,250,0.95)',
+              backgroundColor: 'rgba(96,165,250,0.12)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { 
+                ticks: { color: 'rgba(148,163,184,0.75)', font: { size: 11 } }, 
+                grid: { color: 'rgba(148,163,184,0.10)' } 
+              },
+              y: { 
+                ticks: { color: 'rgba(148,163,184,0.75)' }, 
+                grid: { color: 'rgba(148,163,184,0.10)' }, 
+                suggestedMin: 0, 
+                suggestedMax: 100 
+              }
+            }
+          }
+        });
+      }
+
+      var sevEl = document.getElementById('sevDonut');
+      if (sevEl) {
+        new Chart(sevEl, {
+          type: 'doughnut',
+          data: {
+            labels: sevLabels,
+            datasets: [{
+              data: [sev.Critical || 0, sev.High || 0, sev.Medium || 0, sev.Low || 0],
+              backgroundColor: [
+                'rgba(251,113,133,0.95)',
+                'rgba(251,146,60,0.95)',
+                'rgba(52,211,153,0.95)',
+                'rgba(96,165,250,0.85)'
+              ],
+              borderColor: 'rgba(12,20,34,0.85)',
+              borderWidth: 4,
+              hoverOffset: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: 'rgba(226,232,240,0.85)', boxWidth: 10, boxHeight: 10 }
+              }
+            },
+            cutout: '70%'
+          }
+        });
+      }
+    })();
+  </script>
+{% endblock %}

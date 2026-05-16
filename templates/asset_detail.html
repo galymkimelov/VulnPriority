@@ -1,0 +1,156 @@
+{% extends "_base.html" %}
+{% set active_nav = "assets" %}
+
+{% block title %}{{ t.title_asset_detail }} — {{ asset.ip }}{% endblock %}
+{% block page_title %}{{ t.assets_page_title }}{% endblock %}
+{% block page_subtitle %}{{ asset.ip }} · {{ t.asset_page_sub_suffix }}{% endblock %}
+
+{% block content %}
+  <div class="actions" style="margin-bottom: 14px;">
+    <a class="btn btn-ghost" href="/assets">{{ t.back_assets }}</a>
+    <a class="btn btn-ghost" href="/vulnerabilities">{{ t.open_vulns_link }}</a>
+  </div>
+
+  <div class="row row--tight">
+    <div class="kpi">
+      <div class="kpi__label">{{ t.kpi_asset }}</div>
+      <div class="kpi__value mono" style="font-size: 14px;">{{ asset.ip }}</div>
+    </div>
+    <div class="kpi kpi--warn">
+      <div class="kpi__label">{{ t.kpi_criticality }}</div>
+      <div class="kpi__value">{{ "%.1f"|format(asset.criticality) }}</div>
+    </div>
+    <div class="kpi kpi--critical">
+      <div class="kpi__label">{{ t.kpi_open_vulns }}</div>
+      <div class="kpi__value">{{ vulnerabilities|length }}</div>
+    </div>
+  </div>
+
+  <div class="grid grid--2">
+    <section class="card card--fill">
+      <div class="card__head card__head--row">
+        <div>
+          <div class="card__title">{{ t.hist_trend_title }}</div>
+          <div class="card__sub">{{ t.risk_trend_sub }}</div>
+        </div>
+        <span class="chip chip--soft">{{ trend.labels|length }} {{ t.scans_count }}</span>
+      </div>
+      <div class="card__body">
+        <div style="height: 260px;">
+          <canvas id="assetTrend"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card--fill">
+      <div class="card__head">
+        <div class="card__title">{{ t.patch_title }}</div>
+        <div class="card__sub">{{ t.patch_sub }}</div>
+      </div>
+      <div class="card__body card__body--stack">
+        {% set fixed = (vulnerabilities|selectattr('status','equalto','Fixed')|list|length) if vulnerabilities else 0 %}
+        {% set totalv = vulnerabilities|length if vulnerabilities else 0 %}
+        {% set comp = ((fixed / totalv) * 100) if totalv else 0 %}
+        <div class="ring">
+          <div class="ring__value">{{ comp|round(0)|int }}%</div>
+          <div class="ring__label">{{ t.within_sla_ring }}</div>
+        </div>
+        <div class="bars">
+          <div class="bar">
+            <div class="bar__label">{{ t.compliant_bar }}</div>
+            <div class="bar__track"><div class="bar__fill bar__fill--ok" style="width: {{ comp }}%"></div></div>
+            <div class="bar__num">{{ comp|round(0)|int }}%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">{{ t.at_risk }}</div>
+            {% set risk = 100 - comp %}
+            <div class="bar__track"><div class="bar__fill bar__fill--warn" style="width: {{ risk }}%"></div></div>
+            <div class="bar__num">{{ risk|round(0)|int }}%</div>
+          </div>
+        </div>
+        <div class="card__spacer"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px;">
+    <div class="card__head">
+      <div class="card__title">{{ t.open_vulns_section }}</div>
+      <div class="card__sub">{{ t.open_vulns_sub }}</div>
+    </div>
+    {% if vulnerabilities %}
+      <div class="table-wrapper table-wrapper--dense">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t.th_cve }}</th>
+              <th>{{ t.th_cvss }}</th>
+              <th>{{ t.th_epss }}</th>
+              <th>{{ t.th_risk }}</th>
+              <th>{{ t.th_status }}</th>
+              <th>{{ t.th_open_col }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vulnerabilities %}
+              <tr>
+                <td><a class="link mono" href="/vulnerabilities/{{ v.id }}">{{ v.cve }}</a></td>
+                <td><span class="mono">{{ "%.1f"|format(v.cvss) }}</span></td>
+                <td><span class="mono">{{ "%.3f"|format(v.epss) }}</span></td>
+                <td><span class="pill pill--risk">{{ "%.3f"|format(v.risk_score) }}</span></td>
+                <td>
+                  {% if v.status == "New" %}
+                    <span class="badge status-new">{{ ls('New') }}</span>
+                  {% elif v.status == "In Progress" %}
+                    <span class="badge status-progress">{{ ls('In Progress') }}</span>
+                  {% else %}
+                    <span class="badge status-fixed">{{ ls('Fixed') }}</span>
+                  {% endif %}
+                </td>
+                <td><a class="btn btn-primary btn-sm" href="/vulnerabilities/{{ v.id }}">{{ t.details }}</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state empty-state--compact">
+        <div class="empty-state__sub">{{ t.no_asset_records }}</div>
+      </div>
+    {% endif %}
+  </section>
+
+  <script>
+    (function () {
+      if (!window.Chart) return;
+      var trend = {{ trend|tojson }};
+      var chartAvgLabel = {{ t.chart_avg_risk|tojson }};
+      var el = document.getElementById('assetTrend');
+      if (!el) return;
+      new Chart(el, {
+        type: 'line',
+        data: {
+          labels: trend.labels,
+          datasets: [{
+            label: chartAvgLabel,
+            data: trend.avg_risk,
+            borderColor: 'rgba(96,165,250,0.95)',
+            backgroundColor: 'rgba(96,165,250,0.12)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: 'rgba(148,163,184,0.75)' }, grid: { color: 'rgba(148,163,184,0.10)' } },
+            y: { ticks: { color: 'rgba(148,163,184,0.75)' }, grid: { color: 'rgba(148,163,184,0.10)' }, suggestedMin: 0, suggestedMax: 100 }
+          }
+        }
+      });
+    })();
+  </script>
+{% endblock %}

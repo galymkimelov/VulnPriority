@@ -1,0 +1,77 @@
+{% extends "_base.html" %}
+{% set active_nav = "assets" %}
+
+{% block title %}{{ t.title_assets }}{% endblock %}
+{% block page_title %}{{ t.assets_page_title }}{% endblock %}
+{% block page_subtitle %}{{ t.assets_page_sub }}{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="card__head card__head--row">
+      <div>
+        <div class="card__title">{{ t.assets_card_title }}</div>
+        <div class="card__sub">{{ t.assets_card_sub }}</div>
+      </div>
+      <div class="actions">
+        <a class="btn btn-primary" href="/">{{ t.upload_scan_btn }}</a>
+      </div>
+    </div>
+
+    {% if assets %}
+      <div class="table-wrapper table-wrapper--dense">
+        <table class="assets-table">
+          <colgroup>
+            <col class="assets-table__col-id">
+            <col class="assets-table__col-asset">
+            <col class="assets-table__col-criticality">
+            <col class="assets-table__col-vulns">
+            <col class="assets-table__col-update">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>{{ t.th_id }}</th>
+              <th>{{ t.th_asset }}</th>
+              <th>{{ t.th_criticality }}</th>
+              <th>{{ t.th_vulns }}</th>
+              <th>{{ t.th_update }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for asset in assets %}
+              <tr>
+                <td><span class="muted mono">{{ asset.id }}</span></td>
+                <td><a class="link mono" href="/assets/{{ asset.id }}">{{ asset.ip }}</a></td>
+                <td>
+                  {% if asset.criticality >= 1.0 %}
+                    <span class="badge badge-high">{{ lcrit_badge('Critical') }} ({{ asset.criticality }})</span>
+                  {% elif asset.criticality >= 0.7 %}
+                    <span class="badge badge-medium">{{ lcrit_badge('High') }} ({{ asset.criticality }})</span>
+                  {% else %}
+                    <span class="badge badge-low">{{ lcrit_badge('Medium') }} ({{ asset.criticality }})</span>
+                  {% endif %}
+                </td>
+                <td>{{ asset.vuln_count }}</td>
+                <td>
+                  <form class="inline-form" action="/assets/{{ asset.id }}/criticality" method="post">
+                    <select name="criticality">
+                      {% for opt in criticality_options %}
+                        <option value="{{ opt }}" {% if opt == asset.criticality %}selected{% endif %}>{{ opt }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary btn-sm">{{ t.apply }}</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state__title">{{ t.no_assets_title }}</div>
+        <div class="empty-state__sub">{{ t.no_assets_sub }}</div>
+        <a class="btn btn-primary" href="/">{{ t.upload_scan_btn }}</a>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

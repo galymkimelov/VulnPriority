@@ -1,0 +1,166 @@
+{% extends "_base.html" %}
+{% set active_nav = "upload" %}
+
+{% block title %}{{ t.title_upload }}{% endblock %}
+{% block page_title %}{{ t.page_upload_title }}{% endblock %}
+{% block page_subtitle %}{{ t.page_upload_sub }}{% endblock %}
+
+{% block content %}
+  <div class="grid grid--2">
+    <section class="card">
+      <div class="card__head">
+        <div class="card__title">{{ t.card_upload_title }}</div>
+        <div class="card__sub">{{ t.card_upload_sub }}</div>
+      </div>
+
+      <form class="form" id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+        <label class="file">
+          <input type="file" name="file" id="upload-file-input" accept=".json" required />
+          <span class="file__btn">{{ t.choose_file }}</span>
+          <span class="file__hint">.json</span>
+        </label>
+        <div class="upload-progress" id="upload-progress" aria-hidden="true">
+          <div class="upload-progress__row">
+            <span class="upload-progress__label" id="upload-progress-label"></span>
+            <span class="upload-progress__pct" id="upload-progress-pct"></span>
+          </div>
+          <div class="upload-progress__track">
+            <div class="upload-progress__fill" id="upload-progress-fill"></div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="upload-submit">{{ t.upload_analyze }}</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card__head">
+        <div class="card__title">{{ t.card_formats_title }}</div>
+        <div class="card__sub">{{ t.card_formats_sub }}</div>
+      </div>
+
+      <div class="code-grid" style="grid-template-columns: 1fr;">
+        <div class="code-preview">
+          <div class="code-preview__head">
+            <div class="code-preview__dots" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="code-preview__title">{{ t.format_mvp }}</div>
+          </div>
+          <pre class="code-block code-block--pretty">{
+  "host": "192.168.1.10",
+  "vulnerabilities": [
+    { "cve": "CVE-2021-44228", "cvss": 10.0, "description": "Log4Shell RCE" }
+  ]
+}</pre>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      var form = document.getElementById('upload-form');
+      var btn = document.getElementById('upload-submit');
+      var input = document.getElementById('upload-file-input');
+      var box = document.getElementById('upload-progress');
+      var labelEl = document.getElementById('upload-progress-label');
+      var pctEl = document.getElementById('upload-progress-pct');
+      var fillEl = document.getElementById('upload-progress-fill');
+      var strUploading = {{ t.uploading|tojson }};
+      var strSend = {{ t.upload_send|tojson }};
+      var strProcess = {{ t.upload_processing|tojson }};
+      var strFail = {{ t.upload_failed|tojson }};
+      if (!form || !btn || !input || !box || !labelEl || !pctEl || !fillEl) return;
+
+      function resetProgress() {
+        box.classList.remove('is-visible', 'is-indeterminate');
+        box.setAttribute('aria-hidden', 'true');
+        fillEl.style.width = '0%';
+        pctEl.textContent = '';
+        labelEl.textContent = '';
+      }
+
+      function setPhaseSend(pct) {
+        box.classList.add('is-visible');
+        box.classList.remove('is-indeterminate');
+        box.setAttribute('aria-hidden', 'false');
+        labelEl.textContent = strSend;
+        pctEl.textContent = pct + '%';
+        fillEl.style.width = pct + '%';
+      }
+
+      function setPhaseProcess() {
+        box.classList.add('is-visible', 'is-indeterminate');
+        labelEl.textContent = strProcess;
+        pctEl.textContent = '';
+        fillEl.style.width = '100%';
+      }
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var file = input.files && input.files[0];
+        if (!file) return;
+
+        btn.disabled = true;
+        btn.textContent = strUploading;
+
+        var fd = new FormData();
+        fd.append('file', file);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action || '/upload');
+
+        xhr.upload.onprogress = function (ev) {
+          if (!ev.lengthComputable) {
+            setPhaseSend(0);
+            return;
+          }
+          var pct = Math.min(100, Math.round((ev.loaded / ev.total) * 100));
+          setPhaseSend(pct);
+        };
+
+        xhr.upload.onloadstart = function () {
+          setPhaseSend(0);
+        };
+
+        xhr.onloadstart = function () {
+          /* upload finished sending bytes — server may still work */
+        };
+
+        xhr.onload = function () {
+          if (xhr.status >= 200 && xhr.status < 400) {
+            var next = xhr.responseURL || '/vulnerabilities';
+            window.location.href = next;
+            return;
+          }
+          resetProgress();
+          btn.disabled = false;
+          btn.textContent = {{ t.upload_analyze|tojson }};
+          var msg = strFail;
+          try {
+            var j = JSON.parse(xhr.responseText);
+            if (j && j.detail) {
+              if (typeof j.detail === 'string') msg = j.detail;
+              else if (Array.isArray(j.detail) && j.detail[0] && j.detail[0].msg) msg = j.detail[0].msg;
+            }
+          } catch (err) { /* ignore */ }
+          alert(msg + ' (' + xhr.status + ')');
+        };
+
+        xhr.onerror = function () {
+          resetProgress();
+          btn.disabled = false;
+          btn.textContent = {{ t.upload_analyze|tojson }};
+          alert(strFail);
+        };
+
+        /* When all bytes are uploaded, show indeterminate until response */
+        xhr.upload.onload = function () {
+          setPhaseProcess();
+        };
+
+        xhr.send(fd);
+      });
+    })();
+  </script>
+{% endblock %}
